@@ -1,0 +1,31 @@
+library(sp)
+library(spdep)
+library(rgeos)
+library(rgdal)
+library(raster)
+library(maptools)
+
+##Load diserpsal distance distribution
+load(file = "./fitDist.rdata")
+
+##Load parents home range data
+load(file = "./parents_95_nt.rdata")
+
+##Load pups home range data
+load(file = "./pups_95_nt.rdata")
+
+##Loop generating 5 random HRs for each pup HR
+randomHRs <- lapply(1: length(pups_95_nt@data$id), function(z){
+  center = gCentroid(parents_95_nt[z,], byid = TRUE)
+  centeri = as.data.frame(gCentroid(parents_95_nt[z,], byid = TRUE))[1]+1i*as.data.frame(gCentroid(parents_95_nt[z,], byid = TRUE))[2] #get the cenroid and make it a complex number for convenience
+  angle = runif(5, min = 0, max = 360)#draw turning angles from a random uniform distribution
+  #angle = trunc(angle) trying to make angle work for elide function
+  steps = rlnorm(5, meanlog = fitDist$estimate[[1]], sdlog = fitDist$estimate[[2]]) #sample 5 random distances from distributions with best AIC score from testDist (in this case it was the log normal distribution)
+  relSteps = complex(mod = steps, arg = Arg(centeri[[1]]))
+  rotate = complex(mod = 1, arg = angle)
+  shift = as.data.frame(cbind(Re(relSteps * rotate), Im(relSteps * rotate)))
+    sims <- lapply(1:5, function(e){
+      polyShift = elide(pups_95_nt[z,], center = center@coords, shift = c(shift[e,1], shift[e,2]), rotate = angle[e]) #took out angle for now bcause it's giving me a stupid error
+    })
+  simulatedHRs <- do.call(bind, sims)
+})
